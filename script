@@ -1,4 +1,4 @@
--- LocalScript, place in StarterPlayerScripts or StarterGui
+-- LocalScript, place this in StarterPlayerScripts
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,132 +6,155 @@ local UserInputService = game:GetService("UserInputService")
 local localPlayer = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local espEnabled = false
+local espEnabled = true  -- Start with ESP enabled
 local aimlockEnabled = false
 local currentTarget = nil
+
 local espObjects = {}
 
--- GUI Setup
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
-ScreenGui.Name = "ESP_Aimlock_GUI"
-
-local ToggleESPButton = Instance.new("TextButton", ScreenGui)
-ToggleESPButton.Size = UDim2.new(0, 100, 0, 40)
-ToggleESPButton.Position = UDim2.new(0, 10, 0, 10)
-ToggleESPButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-ToggleESPButton.TextColor3 = Color3.new(1, 1, 1)
-ToggleESPButton.Text = "ESP: OFF"
-ToggleESPButton.Font = Enum.Font.GothamBold
-ToggleESPButton.TextSize = 14
-ToggleESPButton.BorderSizePixel = 0
-ToggleESPButton.BackgroundTransparency = 0.2
-ToggleESPButton.AutoButtonColor = true
-ToggleESPButton.ZIndex = 2
-
--- Toggle ESP On/Off
-local function toggleESP()
-	espEnabled = not espEnabled
-	ToggleESPButton.Text = "ESP: " .. (espEnabled and "ON" or "OFF")
-	
-	for _, v in pairs(espObjects) do
-		if v then v:Destroy() end
-	end
-	table.clear(espObjects)
-end
-
-ToggleESPButton.MouseButton1Click:Connect(toggleESP)
-
--- Create Outline ESP Box
+-- Function to create ESP labels
 local function createESP(player)
-	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-	if player.Team == localPlayer.Team then return end
+    if player == localPlayer then return end
 
-	local box = Instance.new("BillboardGui")
-	box.Name = "ESPBox"
-	box.Adornee = player.Character.HumanoidRootPart
-	box.Size = UDim2.new(4, 0, 5, 0)
-	box.AlwaysOnTop = true
-	box.ResetOnSpawn = false
+    local character = player.Character or player.CharacterAdded:Wait()
+    local head = character:WaitForChild("Head")
 
-	local frame = Instance.new("Frame", box)
-	frame.Name = "Outline"
-	frame.Size = UDim2.new(1, 0, 1, 0)
-	frame.BackgroundTransparency = 1 -- No fill
-	frame.BorderSizePixel = 2
-	frame.BorderColor3 = Color3.new(1, 0, 0) -- Default red
+    -- BillboardGui to show player's name
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP"
+    billboard.Adornee = head
+    billboard.Size = UDim2.new(0, 100, 0, 40)
+    billboard.StudsOffset = Vector3.new(0, 2, 0)  -- Slight offset to make it above the head
+    billboard.AlwaysOnTop = true
+    billboard.Parent = head
 
-	box.Parent = game.CoreGui
-	espObjects[player] = box
+    -- Name label to display the player's name
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 0, 0)  -- Red text
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextScaled = true
+    nameLabel.Parent = billboard
+
+    -- Make sure the ESP label updates if the player moves
+    RunService.RenderStepped:Connect(function()
+        local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
+        nameLabel.Visible = onScreen  -- Hide ESP if player is off-screen
+    end)
+
+    -- Store the ESP object for later removal
+    table.insert(espObjects, billboard)
 end
 
--- Update ESP
-RunService.RenderStepped:Connect(function()
-	if espEnabled then
-		for _, player in pairs(Players:GetPlayers()) do
-			if player ~= localPlayer and player.Team ~= localPlayer.Team then
-				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-					if not espObjects[player] then
-						createESP(player)
-					end
-					local gui = espObjects[player]
-					local health = player.Character.Humanoid.Health
-					local maxHealth = player.Character.Humanoid.MaxHealth
-					local percent = math.clamp(health / maxHealth, 0, 1)
-					if gui and gui:FindFirstChild("Outline") then
-						gui.Outline.BorderColor3 = Color3.fromRGB(255 * (1 - percent), 255 * percent, 0)
-					end
-				end
-			elseif espObjects[player] then
-				espObjects[player]:Destroy()
-				espObjects[player] = nil
-			end
-		end
-	else
-		for _, box in pairs(espObjects) do
-			if box then box:Destroy() end
-		end
-		table.clear(espObjects)
-	end
-end)
-
--- Get Closest Player to Mouse
+-- Function to get the closest player to the mouse cursor
 local function getClosestPlayerToMouse()
-	local closestPlayer = nil
-	local shortestDistance = math.huge
-	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
-			local head = player.Character.Head
-			local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
-			if onScreen then
-				local mousePos = UserInputService:GetMouseLocation()
-				local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
-				if distance < shortestDistance then
-					shortestDistance = distance
-					closestPlayer = player
-				end
-			end
-		end
-	end
-	return closestPlayer
+    local target = nil
+    local shortest = math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            local pos, onScreen = camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local mousePos = UserInputService:GetMouseLocation()
+                local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+                if dist < shortest then
+                    shortest = dist
+                    target = player
+                end
+            end
+        end
+    end
+    return target
 end
 
--- Lock Aim to Head
-RunService.RenderStepped:Connect(function()
-	if aimlockEnabled and currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("Head") then
-		camera.CFrame = CFrame.new(camera.CFrame.Position, currentTarget.Character.Head.Position)
-	end
+-- Lock the camera to aim at the closest player's head
+local function aimlock()
+    if aimlockEnabled and currentTarget then
+        local targetHead = currentTarget.Character and currentTarget.Character:FindFirstChild("Head")
+        if targetHead then
+            camera.CFrame = CFrame.new(camera.CFrame.Position, targetHead.Position)  -- Locks camera to head
+        end
+    end
+end
+
+-- Toggle ESP on and off
+local function toggleESP()
+    espEnabled = not espEnabled
+    if espEnabled then
+        -- Recreate ESP for all players
+        for _, player in pairs(Players:GetPlayers()) do
+            createESP(player)
+        end
+    else
+        -- Remove all ESP objects
+        for _, espObject in pairs(espObjects) do
+            espObject:Destroy()
+        end
+        espObjects = {}  -- Clear the stored ESP objects
+    end
+end
+
+-- Listen for when the player presses Q to toggle the aimlock
+UserInputService.InputBegan:Connect(function(input, isTyping)
+    if isTyping then return end  -- Ignore if the player is typing
+
+    if input.KeyCode == Enum.KeyCode.Q then
+        if aimlockEnabled then
+            -- Turn off aimlock
+            aimlockEnabled = false
+            currentTarget = nil
+        else
+            -- Turn on aimlock and get the closest player to the mouse
+            currentTarget = getClosestPlayerToMouse()
+            if currentTarget then
+                aimlockEnabled = true
+            end
+        end
+    end
 end)
 
--- Toggle Aimlock with Q
-UserInputService.InputBegan:Connect(function(input, isTyping)
-	if isTyping then return end
-	if input.KeyCode == Enum.KeyCode.Q then
-		if aimlockEnabled then
-			aimlockEnabled = false
-			currentTarget = nil
-		else
-			currentTarget = getClosestPlayerToMouse()
-			aimlockEnabled = currentTarget ~= nil
-		end
-	end
+-- Update the aimlock position every frame
+RunService.RenderStepped:Connect(function()
+    aimlock()
 end)
+
+-- Add ESP to all current players
+for _, player in pairs(Players:GetPlayers()) do
+    createESP(player)
+end
+
+-- Add ESP to new players who join
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        createESP(player)
+    end)
+end)
+
+-- Remove ESP when a player leaves
+Players.PlayerRemoving:Connect(function(player)
+    if player.Character then
+        local head = player.Character:FindFirstChild("Head")
+        if head then
+            local billboard = head:FindFirstChild("ESP")
+            if billboard then
+                billboard:Destroy()  -- Clean up ESP when player leaves
+            end
+        end
+    end
+end)
+
+-- Reset ESP every 5 seconds to detect new players
+while true do
+    wait(5)
+    if espEnabled then
+        -- Recreate ESP for players who may have joined
+        for _, player in pairs(Players:GetPlayers()) do
+            -- Create ESP if the player doesn't already have it
+            if not player.Character or not player.Character:FindFirstChild("Head") then
+                createESP(player)
+            end
+        end
+    end
+end
