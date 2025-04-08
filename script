@@ -1,160 +1,116 @@
--- LocalScript, place this in StarterPlayerScripts
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local localPlayer = Players.LocalPlayer
-local camera = workspace.CurrentCamera
+local Window = Rayfield:CreateWindow({
+   Name = "A And C Project",
+   Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
+   LoadingTitle = "Sigma Boys",
+   LoadingSubtitle = "by Anton And Carl",
+   Theme = "Default", -- Check https://docs.sirius.menu/rayfield/configuration/themes
 
-local espEnabled = true  -- Start with ESP enabled
-local aimlockEnabled = false
-local currentTarget = nil
+   DisableRayfieldPrompts = false,
+   DisableBuildWarnings = false,
 
-local espObjects = {}
+   ConfigurationSaving = {
+      Enabled = false,
+      FolderName = nil, -- Create a custom folder for your hub/game
+      FileName = "Big Hub"
+   },
 
--- Function to create ESP labels
-local function createESP(player)
-    if player == localPlayer then return end
+   Discord = {
+      Enabled = false,
+      Invite = "noinvitelink",
+      RememberJoins = true
+   },
 
-    local character = player.Character or player.CharacterAdded:Wait()
-    local head = character:WaitForChild("Head")
+   KeySystem = false, --
+   KeySettings = {
+      Title = "Untitled",
+      Subtitle = "Key System",
+      Note = "No method of obtaining the key is provided",
+      FileName = "Key",
+      SaveKey = true,
+      GrabKeyFromSite = false,
+      Key = {"Hello"}
+   }
+})
 
-    -- BillboardGui to show player's name
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "ESP"
-    billboard.Adornee = head
-    billboard.Size = UDim2.new(0, 100, 0, 40)
-    billboard.StudsOffset = Vector3.new(0, 2, 0)  -- Slight offset to make it above the head
-    billboard.AlwaysOnTop = true
-    billboard.Parent = head
+local MainTab = Window:CreateTab("Aimbot", nil)
+local MainSection = MainTab:CreateSection("Main")
 
-    -- Name label to display the player's name
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 1, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = player.Name
-    nameLabel.TextColor3 = Color3.fromRGB(255, 0, 0)  -- Red text
-    nameLabel.TextStrokeTransparency = 0
-    nameLabel.TextScaled = true
-    nameLabel.Parent = billboard
+Rayfield:Notify({
+   Title = "Good Job",
+   Content = "Sigmaful Execution",
+   Duration = 4,
+   Image = nil,
+})
 
-    -- Make sure the ESP label updates if the player moves
-    RunService.RenderStepped:Connect(function()
-        local screenPos, onScreen = camera:WorldToViewportPoint(head.Position)
-        nameLabel.Visible = onScreen  -- Hide ESP if player is off-screen
+local Button = MainTab:CreateButton({
+   Name = "Esp + Aimbot", -- Toggle Q For Aimbot
+   Callback = function()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/dahoodaimlocker/script/refs/heads/main/script"))()
+   end,
+})
+
+local Slider = MainTab:CreateSlider({
+   Name = "WalkSpeed Slider",
+   Range = {0,  300},
+   Increment = 1,
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "Slider1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = (Value)
+   end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "FlyV1",
+   Callback = function()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()
+   end,
+})
+
+local Button = MainTab:CreateButton({
+   Name = "Infinite Jump Toggle",
+   Callback = function()
+       --Toggles the infinite jump between on or off on every script run
+_G.infinjump = not _G.infinjump
+
+if _G.infinJumpStarted == nil then
+    --Ensures this only runs once to save resources
+    _G.infinJumpStarted = true
+
+    --Notifies readiness
+    game.StarterGui:SetCore("SendNotification", {Title="Youtube Hub"; Text="Infinite Jump Activated!"; Duration=5;})
+
+    --The actual infinite jump
+    local plr = game:GetService('Players').LocalPlayer
+    local m = plr:GetMouse()
+    m.KeyDown:connect(function(k)
+        if _G.infinjump then
+            if k:byte() == 32 then
+            humanoid = game:GetService'Players'.LocalPlayer.Character:FindFirstChildOfClass('Humanoid')
+            humanoid:ChangeState('Jumping')
+            wait()
+            humanoid:ChangeState('Seated')
+            end
+        end
     end)
-
-    -- Store the ESP object for later removal
-    table.insert(espObjects, billboard)
 end
+   end,
+})
 
--- Function to get the closest player to the mouse cursor
-local function getClosestPlayerToMouse()
-    local target = nil
-    local shortest = math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local head = player.Character.Head
-            local pos, onScreen = camera:WorldToViewportPoint(head.Position)
-            if onScreen then
-                local mousePos = UserInputService:GetMouseLocation()
-                local dist = (Vector2.new(pos.X, pos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
-                if dist < shortest then
-                    shortest = dist
-                    target = player
-                end
-            end
-        end
-    end
-    return target
-end
+local Slider = MainTab:CreateSlider({
+   Name = "JumpPower Slider",
+   Range = {1, 300},
+   Increment = 1,
+   Suffix = "Speed",
+   CurrentValue = 16,
+   Flag = "sliderjp", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+        game.Players.LocalPlayer.Character.Humanoid.JumpPower = (Value)
+   end,
+})
 
--- Lock the camera to aim at the closest player's head
-local function aimlock()
-    if aimlockEnabled and currentTarget then
-        local targetHead = currentTarget.Character and currentTarget.Character:FindFirstChild("Head")
-        if targetHead then
-            camera.CFrame = CFrame.new(camera.CFrame.Position, targetHead.Position)  -- Locks camera to head
-        end
-    end
-end
-
--- Toggle ESP on and off
-local function toggleESP()
-    espEnabled = not espEnabled
-    if espEnabled then
-        -- Recreate ESP for all players
-        for _, player in pairs(Players:GetPlayers()) do
-            createESP(player)
-        end
-    else
-        -- Remove all ESP objects
-        for _, espObject in pairs(espObjects) do
-            espObject:Destroy()
-        end
-        espObjects = {}  -- Clear the stored ESP objects
-    end
-end
-
--- Listen for when the player presses Q to toggle the aimlock
-UserInputService.InputBegan:Connect(function(input, isTyping)
-    if isTyping then return end  -- Ignore if the player is typing
-
-    if input.KeyCode == Enum.KeyCode.Q then
-        if aimlockEnabled then
-            -- Turn off aimlock
-            aimlockEnabled = false
-            currentTarget = nil
-        else
-            -- Turn on aimlock and get the closest player to the mouse
-            currentTarget = getClosestPlayerToMouse()
-            if currentTarget then
-                aimlockEnabled = true
-            end
-        end
-    end
-end)
-
--- Update the aimlock position every frame
-RunService.RenderStepped:Connect(function()
-    aimlock()
-end)
-
--- Add ESP to all current players
-for _, player in pairs(Players:GetPlayers()) do
-    createESP(player)
-end
-
--- Add ESP to new players who join
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        createESP(player)
-    end)
-end)
-
--- Remove ESP when a player leaves
-Players.PlayerRemoving:Connect(function(player)
-    if player.Character then
-        local head = player.Character:FindFirstChild("Head")
-        if head then
-            local billboard = head:FindFirstChild("ESP")
-            if billboard then
-                billboard:Destroy()  -- Clean up ESP when player leaves
-            end
-        end
-    end
-end)
-
--- Reset ESP every 5 seconds to detect new players
-while true do
-    wait(5)
-    if espEnabled then
-        -- Recreate ESP for players who may have joined
-        for _, player in pairs(Players:GetPlayers()) do
-            -- Create ESP if the player doesn't already have it
-            if not player.Character or not player.Character:FindFirstChild("Head") then
-                createESP(player)
-            end
-        end
-    end
-end
+local MainTab = Window:CreateTab("Admin", nil)
+local MainSection = MainTab:CreateSection("Main")
