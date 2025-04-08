@@ -1,0 +1,124 @@
+-- LocalScript: Put in StarterPlayerScripts
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local localPlayer = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local aimlockEnabled = false
+local target = nil
+local espTags = {}
+
+-- === ESP Cleanup ===
+local function clearESP()
+	for _, tag in pairs(espTags) do
+		if tag and tag.Parent then
+			tag:Destroy()
+		end
+	end
+	espTags = {}
+end
+
+-- === ESP Function ===
+local function createESP(player)
+	if player == localPlayer then return end
+	local character = player.Character
+	if not character then return end
+
+	local head = character:FindFirstChild("Head")
+	if not head then return end
+
+	-- Highlight
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ESP_Highlight"
+	highlight.FillColor = Color3.fromRGB(255, 0, 0)
+	highlight.FillTransparency = 0.7
+	highlight.OutlineColor = Color3.new(1, 1, 1)
+	highlight.OutlineTransparency = 0.1
+	highlight.Adornee = character
+	highlight.Parent = character
+	table.insert(espTags, highlight)
+
+	-- Billboard Name Tag
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ESP_NameTag"
+	billboard.Adornee = head
+	billboard.Size = UDim2.new(0, 200, 0, 30)
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.AlwaysOnTop = true
+
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Text = player.Name
+	label.TextColor3 = Color3.fromRGB(255, 0, 0)
+	label.TextStrokeTransparency = 0
+	label.TextScaled = true
+	label.Font = Enum.Font.GothamBold
+	label.Parent = billboard
+
+	billboard.Parent = character
+	table.insert(espTags, billboard)
+end
+
+-- === Refresh ESP Every 5 Seconds ===
+task.spawn(function()
+	while true do
+		clearESP()
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
+				createESP(player)
+			end
+		end
+		task.wait(5)
+	end
+end)
+
+-- === Aimbot Functions ===
+local function getClosestPlayer()
+	local closest = nil
+	local shortest = math.huge
+	local mouse = UserInputService:GetMouseLocation()
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= localPlayer and player.Character and player.Character:FindFirstChild("Head") then
+			local head = player.Character.Head
+			local screenPoint, onScreen = camera:WorldToViewportPoint(head.Position)
+			if onScreen then
+				local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - Vector2.new(mouse.X, mouse.Y)).Magnitude
+				if distance < shortest then
+					shortest = distance
+					closest = player
+				end
+			end
+		end
+	end
+
+	return closest
+end
+
+-- Lock to head each frame
+RunService.RenderStepped:Connect(function()
+	if aimlockEnabled and target and target.Character and target.Character:FindFirstChild("Head") then
+		camera.CFrame = CFrame.new(camera.CFrame.Position, target.Character.Head.Position)
+	end
+end)
+
+-- Toggle aimlock on Q press
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.Q then
+		if aimlockEnabled then
+			aimlockEnabled = false
+			target = nil
+			print("Aimlock OFF")
+		else
+			target = getClosestPlayer()
+			if target then
+				aimlockEnabled = true
+				print("Aimlock ON → " .. target.Name)
+			end
+		end
+	end
+end)
